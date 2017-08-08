@@ -1060,7 +1060,7 @@ void json_set_time(JSONNODE *n, const wchar_t *name, NSDate *date)
 		int hour = [[localDateString substringWithRange:NSMakeRange(11,2)]integerValue];
 		int minute = [[localDateString substringWithRange:NSMakeRange(14,2)]integerValue];
 		int second = [[localDateString substringWithRange:NSMakeRange(17,2)]integerValue];
-		int time = second + (minute * 60) + (hour * 3600) * 1000;
+		int time = (second + (minute * 60) + (hour * 3600)) * 1000;
 		
 		json_push_back(n, json_new_i(name, time));
 	}
