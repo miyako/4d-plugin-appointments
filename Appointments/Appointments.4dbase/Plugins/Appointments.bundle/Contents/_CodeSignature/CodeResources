@@ -90,7 +90,7 @@
 		</data>
 		<key>Resources/Documentation/index.html</key>
 		<data>
-		XhMvO1t7B/4Km5CO9dJGc8KtLtA=
+		Czs6A27ReNX1PeGjarSpAjdicd0=
 		</data>
 		<key>Resources/Documentation/styles/common.css</key>
 		<data>
@@ -100,7 +100,7 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			ySGaHrVgsg1f+eyTroouMxlhQE0=
+			boDH8nPSEOJF5zvhLiTgex8uBrU=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -358,11 +358,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			XhMvO1t7B/4Km5CO9dJGc8KtLtA=
+			Czs6A27ReNX1PeGjarSpAjdicd0=
 			</data>
 			<key>hash2</key>
 			<data>
-			CQSqIh+Grh8coukJMhzgY+l6xlfPXu7VH/tnM/RqUvg=
+			IzBis35/2gdwjfOZQ8MWgIWb369qcHk/Z58FzWUZBcc=
 			</data>
 		</dict>
 		<key>Resources/Documentation/styles/common.css</key>
@@ -380,11 +380,11 @@
 		<dict>
 			<key>hash</key>
 			<data>
-			ySGaHrVgsg1f+eyTroouMxlhQE0=
+			boDH8nPSEOJF5zvhLiTgex8uBrU=
 			</data>
 			<key>hash2</key>
 			<data>
-			8/AOye/N2HZpY3Wf2EkKuk/rShx9bdQC4pwHl/M2nUk=
+			bILV1Z0YgfmuN9DaS+AhZmhlJ9/q1L8E6afsb8yggY4=
 			</data>
 			<key>optional</key>
 			<true/>
@@ -411,17 +411,6 @@
 			rp5mwPoToTOMBrO5g9ATVRBDkkR1XpJE6MF06FX5mo0=
 			</data>
 		</dict>
-		<key>Windows/Appointments.html</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			3f3hE90+GMuzyHmK9RVQvLK+Zs8=
-			</data>
-			<key>hash2</key>
-			<data>
-			EKLRdLPtg+PsdxOrCPdnhlHZLbWCJYLapu/sbQTYgHg=
-			</data>
-		</dict>
 		<key>Windows64/Appointments.4DX</key>
 		<dict>
 			<key>hash</key>
@@ -433,22 +422,11 @@
 			D81BlAXC8IYBjKsGDu0nx8Zm3OxlDG6/r2pFvj/FY7A=
 			</data>
 		</dict>
-		<key>Windows64/Appointments.html</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			3f3hE90+GMuzyHmK9RVQvLK+Zs8=
-			</data>
-			<key>hash2</key>
-			<data>
-			EKLRdLPtg+PsdxOrCPdnhlHZLbWCJYLapu/sbQTYgHg=
-			</data>
-		</dict>
 		<key>manifest.json</key>
 		<dict>
 			<key>cdhash</key>
 			<data>
-			Xr1D0lQVZm1HtKN8mzc8c/uNTUU=
+			BfoRcYTLHhbhwDc5k8M6FmkjwwA=
 			</data>
 			<key>requirement</key>
 			<string>identifier manifest and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = Y69CWUC25B</string>

@@ -15,16 +15,6 @@
 #define DATE_FORMAT_ISO @"yyyy-MM-dd'T'HH:mm:ss"
 #define DATE_FORMAT_ISO_GMT @"yyyy-MM-dd'T'HH:mm:ss'Z'"
 
-//typedef struct
-//{
-//	C_TEXT _method;
-//	PA_long32 method_id;
-//	const PA_Unichar *method;
-//	size_t method_size;
-//}appointment_ctx;
-//
-//appointment_ctx APPOINTMENT_CTX;
-
 namespace DateFormatter
 {
 	NSDateFormatter *ISO;
@@ -683,12 +673,12 @@ void Get_appointment(sLONG_PTR *pResult, PackagePtr pParams)
 			{
 				JSONNODE *e = json_new(JSON_NODE);
 				json_set_event(e, event);
-				json_stringify(e, returnValue);
+				json_stringify(e, returnValue, FALSE);
 				json_delete(e);
 			}
 		}
 		
-		json_stringify(r, Param2);
+		json_stringify(r, Param2, FALSE);
 		json_delete(r);
 	}
 	
@@ -728,7 +718,7 @@ void DELETE_APPOINTMENT(sLONG_PTR *pResult, PackagePtr pParams)
 				}
 			}
 		}
-		json_stringify(r, Param2);
+		json_stringify(r, Param2, FALSE);
 		json_delete(r);
 	}
 	
@@ -764,32 +754,35 @@ void UPDATE_APPOINTMENT(sLONG_PTR *pResult, PackagePtr pParams)
 			
 			if(defaultCalendarStore)
 			{
-				CalEvent *event = json_get_event(r, Param1);
-				
-				if(event)
+				@autoreleasepool
 				{
-					event.location = json_get_text(e, L"location");
-					event.notes = json_get_text(e, L"notes");
-					event.title = json_get_text(e, L"title");
-					event.url = json_get_url(e, L"url");
-					event.startDate = json_get_date(e, L"startDate");
-					event.endDate = json_get_date(e, L"endDate");
-					NSError *err = nil;
-					if(![defaultCalendarStore saveEvent:event span:CalSpanThisEvent error:&err])
+					CalEvent *event = json_get_event(r, Param1);
+					
+					if(event)
 					{
-						json_set_text(r, L"saveEvent", @"save failed");
-						json_set_text(r, L"saveEventErrorDescription", [err description]);
-					}else{
-						//OK
-						json_set_text(r, L"saveEvent", @"OK");
-						json_set_event(e, event);
+						event.location = json_get_text(e, L"location");
+						event.notes = json_get_text(e, L"notes");
+						event.title = json_get_text(e, L"title");
+						event.url = json_get_url(e, L"url");
+						event.startDate = json_get_date(e, L"startDate");
+						event.endDate = json_get_date(e, L"endDate");
+						NSError *err = nil;
+						if(![defaultCalendarStore saveEvent:event span:CalSpanThisEvent error:&err])
+						{
+							json_set_text(r, L"saveEvent", @"save failed");
+							json_set_text(r, L"saveEventErrorDescription", [err description]);
+						}else{
+							//OK
+							json_set_text(r, L"saveEvent", @"OK");
+							json_set_event(e, event);
+						}
 					}
 				}
 			}
-			json_stringify(e, Param2);
+			json_stringify(e, Param2, FALSE);
 			json_delete(ee);
 		}
-		json_stringify(r, Param3);
+		json_stringify(r, Param3, FALSE);
 		json_delete(r);
 	}
 	Param2.toParamAtIndex(pParams, 2);
@@ -829,30 +822,33 @@ void CREATE_APPOINTMENT(sLONG_PTR *pResult, PackagePtr pParams)
 				
 				if(calendar)
 				{
-					CalEvent *event = [CalEvent event];
-					event.calendar = calendar;
-					event.location = json_get_text(e, L"location");
-					event.notes = json_get_text(e, L"notes");
-					event.title = json_get_text(e, L"title");
-					event.url = json_get_url(e, L"url");
-					event.startDate = json_get_date(e, L"startDate");
-					event.endDate = json_get_date(e, L"endDate");
-					NSError *err = nil;
-					if(![defaultCalendarStore saveEvent:event span:CalSpanThisEvent error:&err])
+					@autoreleasepool
 					{
-						json_set_text(r, L"saveEvent", @"save failed");
-						json_set_text(r, L"saveEventErrorDescription", [err description]);
-					}else{
-						//OK
-						json_set_text(r, L"saveEvent", @"OK");
-						json_set_event(e, event);
+						CalEvent *event = [CalEvent event];
+						event.calendar = calendar;
+						event.location = json_get_text(e, L"location");
+						event.notes = json_get_text(e, L"notes");
+						event.title = json_get_text(e, L"title");
+						event.url = json_get_url(e, L"url");
+						event.startDate = json_get_date(e, L"startDate");
+						event.endDate = json_get_date(e, L"endDate");
+						NSError *err = nil;
+						if(![defaultCalendarStore saveEvent:event span:CalSpanThisEvent error:&err])
+						{
+							json_set_text(r, L"saveEvent", @"save failed");
+							json_set_text(r, L"saveEventErrorDescription", [err description]);
+						}else{
+							//OK
+							json_set_text(r, L"saveEvent", @"OK");
+							json_set_event(e, event);
+						}
 					}
 				}
 			}
-			json_stringify(e, Param2);
+			json_stringify(e, Param2, FALSE);
 			json_delete(ee);
 		}
-		json_stringify(r, Param3);
+		json_stringify(r, Param3, FALSE);
 		json_delete(r);
 	}
 	Param2.toParamAtIndex(pParams, 2);
@@ -937,10 +933,6 @@ void ON_APPOINTMENT_CALL(sLONG_PTR *pResult, PackagePtr pParams)
 			CalendarWatch::addToWatch(path, methodId);
 		}
 	}
-//	APPOINTMENT_CTX._method.fromParamAtIndex(pParams, 1);
-//	APPOINTMENT_CTX.method = APPOINTMENT_CTX._method.getUTF16StringPtr();
-//	APPOINTMENT_CTX.method_size = APPOINTMENT_CTX._method.getUTF16Length();
-//	APPOINTMENT_CTX.method_id = PA_GetMethodID((PA_Unichar *)APPOINTMENT_CTX.method);
 }
 
 void ALL_APPOINTMENTS(sLONG_PTR *pResult, PackagePtr pParams)
@@ -979,7 +971,7 @@ void ALL_APPOINTMENTS(sLONG_PTR *pResult, PackagePtr pParams)
 		}
 	}
 	
-	json_stringify(ee, Param2);
+	json_stringify(ee, Param2, FALSE);
 	json_delete(ee);
 	
 	Param2.toParamAtIndex(pParams, 2);
@@ -988,25 +980,22 @@ void ALL_APPOINTMENTS(sLONG_PTR *pResult, PackagePtr pParams)
 void APPOINTMENT_NAMES(sLONG_PTR *pResult, PackagePtr pParams)
 {
 	ARRAY_TEXT Param1;
-	C_TEXT Param2;
-
-	JSONNODE *ee = json_new(JSON_ARRAY);
+	ARRAY_TEXT Param2;
 	
 	CalCalendarStore *defaultCalendarStore = [CalCalendarStore defaultCalendarStore];
 	
 	if(defaultCalendarStore)
 	{
 		Param1.setSize(1);
+		Param2.setSize(1);
 		NSArray *calendars = [defaultCalendarStore calendars];
 		for(NSUInteger i = 0; i < [calendars count]; ++i)
 		{
 			CalCalendar *c = [calendars objectAtIndex:i];
 			Param1.appendUTF16String([c title]);
+			Param2.appendUTF16String([c uid]);
 		}
 	}
-	
-	json_stringify(ee, Param2);
-	json_delete(ee);
 	
 	Param1.toParamAtIndex(pParams, 1);
 	Param2.toParamAtIndex(pParams, 2);
@@ -1066,6 +1055,15 @@ void json_set_time(JSONNODE *n, const wchar_t *name, NSDate *date)
 	}
 }
 
+void json_set_duration(JSONNODE *n, const wchar_t *name, NSDate *startDate, NSDate *endDate)
+{
+	if((n) && (name) && (startDate) && (endDate))
+	{
+		NSTimeInterval duration = [endDate timeIntervalSinceDate:startDate];
+		json_push_back(n, json_new_i(name, duration));
+	}
+}
+
 void json_set_event(JSONNODE *obj, CalEvent *event)
 {
 	json_set_text(obj, L"location", [event location]);
@@ -1079,13 +1077,16 @@ void json_set_event(JSONNODE *obj, CalEvent *event)
 	json_set_time(obj, L"endDateTime", [event endDate]);
 	json_set_time(obj, L"startDateTime", [event startDate]);
 	json_set_time(obj, L"dateStampTime", [event dateStamp]);
+	
+	json_set_text(obj, L"calendarName", [[event calendar]name]);
+	json_set_duration(obj, L"duration", [event startDate], [event endDate]);
 }
 
 #pragma mark JSON Get
 
-BOOL json_get_string(JSONNODE *json, const wchar_t *name, CUTF8String &value)
+BOOL json_get_string(JSONNODE *json, const wchar_t *name, C_TEXT& value)
 {
-	value = (const uint8_t *)"";
+	BOOL gotValue = FALSE;
 	
 	if(json)
 	{
@@ -1096,14 +1097,9 @@ BOOL json_get_string(JSONNODE *json, const wchar_t *name, CUTF8String &value)
 			
 			std::wstring wstr = std::wstring(s);
 			
-			C_TEXT t;
-			
-#if VERSIONWIN
-			t.setUTF16String((const PA_Unichar *)wstr.c_str(), (uint32_t)wstr.length());
-#else
 			uint32_t dataSize = (uint32_t)((wstr.length() * sizeof(wchar_t)) + sizeof(PA_Unichar));
 			std::vector<char> buf(dataSize);
-			
+			//returns byte size in toString (in this case, need to /2 to get characters)
 			uint32_t len = PA_ConvertCharsetToCharset((char *)wstr.c_str(),
 																								(PA_long32)(wstr.length() * sizeof(wchar_t)),
 																								eVTC_UTF_32,
@@ -1111,31 +1107,29 @@ BOOL json_get_string(JSONNODE *json, const wchar_t *name, CUTF8String &value)
 																								dataSize,
 																								eVTC_UTF_16);
 			
-			t.setUTF16String((const PA_Unichar *)&buf[0], len);
-#endif
-			
-			t.copyUTF8String(&value);
+			value.setUTF16String((const PA_Unichar *)&buf[0], len/sizeof(PA_Unichar));
+			gotValue = TRUE;
 			
 			json_free(s);
 		}
 	}
 	
-	return !!value.length();
+	return gotValue;
 }
 
 NSString *json_get_text(JSONNODE *obj, const wchar_t *name)
 {
 	NSString *string = nil;
-	
-	CUTF8String value;
+	C_TEXT value;
 	if(json_get_string(obj, name, value))
 	{
-		string = [NSString stringWithUTF8String:(const char *)value.c_str()];
+		CUTF8String u8;
+		value.copyUTF8String(&u8);
+		string = [NSString stringWithUTF8String:(const char *)u8.c_str()];
 	}else
 	{
 		string = [NSString stringWithUTF8String:(const char *)""];
 	}
-	
 	return string;
 }
 
@@ -1148,13 +1142,10 @@ NSDate *json_get_date(JSONNODE *obj, const wchar_t *name)
 {
 	NSDate *date = nil;
 	
-	CUTF8String value;
+	C_TEXT value;
 	if(json_get_string(obj, name, value))
 	{
-		C_TEXT temp;
-		temp.setUTF8String(&value);
-		NSString *s = temp.copyUTF16String();
-		
+		NSString *s = value.copyUTF16String();
 		if([s hasSuffix:@"Z"])
 		{
 			date = [DateFormatter::GMT dateFromString:s];
@@ -1162,7 +1153,6 @@ NSDate *json_get_date(JSONNODE *obj, const wchar_t *name)
 		{
 			date = [DateFormatter::ISO dateFromString:s];
 		}
-		
 		[s release];
 	}
 
@@ -1233,42 +1223,49 @@ CalCalendar *json_get_calendar(JSONNODE *obj, C_TEXT& Param1)
 
 #pragma mark JSON
 
-JSONNODE *json_parse(C_TEXT &t)
+void json_wconv(C_TEXT &t, std::wstring &u32)
 {
-	std::wstring u32;
-	
-#if VERSIONWIN
-	u32 = std::wstring((wchar_t *)t.getUTF16StringPtr());
-#else
-	
-	uint32_t dataSize = (t.getUTF16Length() * sizeof(wchar_t))+ sizeof(wchar_t);
-	std::vector<char> buf(dataSize);
-	
-	PA_ConvertCharsetToCharset((char *)t.getUTF16StringPtr(),
-														 t.getUTF16Length() * sizeof(PA_Unichar),
-														 eVTC_UTF_16,
-														 (char *)&buf[0],
-														 dataSize,
-														 eVTC_UTF_32);
-	
-	u32 = std::wstring((wchar_t *)&buf[0]);
-#endif
-	return json_parse((json_const json_char *)u32.c_str());
+	if(t.getUTF16Length())
+	{
+		uint32_t dataSize = (t.getUTF16Length() * sizeof(wchar_t))+ sizeof(wchar_t);
+		std::vector<char> buf(dataSize);
+		
+		PA_ConvertCharsetToCharset((char *)t.getUTF16StringPtr(),
+															 t.getUTF16Length() * sizeof(PA_Unichar),
+															 eVTC_UTF_16,
+															 (char *)&buf[0],
+															 dataSize,
+															 eVTC_UTF_32);
+		
+		u32 = std::wstring((wchar_t *)&buf[0]);
+	}else
+	{
+		u32 = L"";
+	}
 }
 
-void json_stringify(JSONNODE *json, C_TEXT &t)
+JSONNODE *json_parse(C_TEXT &t)
 {
-	json_char *json_string = json_write_formatted(json);
+	std::wstring w32;
+	json_wconv(t, w32);
+	
+	return json_parse((json_const json_char *)w32.c_str());
+}
+
+void json_stringify(JSONNODE *json, C_TEXT &t, BOOL pretty)
+{
+	json_char *json_string = pretty ? json_write_formatted(json) : json_write(json);
 	std::wstring wstr = std::wstring(json_string);
 	uint32_t dataSize = (uint32_t)((wstr.length() * sizeof(wchar_t))+ sizeof(PA_Unichar));
 	std::vector<char> buf(dataSize);
+	//returns byte size in toString (in this case, need to /2 to get characters)
 	uint32_t len = PA_ConvertCharsetToCharset((char *)wstr.c_str(),
 																						(PA_long32)(wstr.length() * sizeof(wchar_t)),
 																						eVTC_UTF_32,
 																						(char *)&buf[0],
 																						dataSize,
 																						eVTC_UTF_16);
-	t.setUTF16String((const PA_Unichar *)&buf[0], len);
+	t.setUTF16String((const PA_Unichar *)&buf[0], len/sizeof(PA_Unichar));
 	json_free(json_string);
 }
 
@@ -1293,7 +1290,7 @@ void event_to_json(CUTF16String *eventId, CUTF16String *eventJson)
 			
 			json_push_back(ee, e);
 			
-			json_stringify(ee, Param1);
+			json_stringify(ee, Param1, FALSE);
 			
 			Param1.copyUTF16String(eventJson);
 			json_delete(ee);

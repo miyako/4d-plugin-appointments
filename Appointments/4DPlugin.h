@@ -21,7 +21,8 @@ void ON_APPOINTMENT_CALL(sLONG_PTR *pResult, PackagePtr pParams);
 void CREATE_APPOINTMENT(sLONG_PTR *pResult, PackagePtr pParams);
 void APPOINTMENT_NAMES(sLONG_PTR *pResult, PackagePtr pParams);
 
-void json_stringify(JSONNODE *json, C_TEXT &t);
+void json_wconv(C_TEXT &t, std::wstring &u32);
+void json_stringify(JSONNODE *json, C_TEXT &t, BOOL pretty);
 JSONNODE *json_parse(C_TEXT &t);
 
 void json_set_event(JSONNODE *obj, CalEvent *event);
