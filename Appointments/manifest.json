@@ -4,22 +4,22 @@
     "commands": [
         {
             "theme": "Appointments",
-            "syntax": "ALL APPOINTMENTS(&T;&T)",
+            "syntax": "ALL APPOINTMENTS(&T):J",
             "threadSafe": true
         },
         {
             "theme": "Appointments",
-            "syntax": "Get appointment(&T;&T):T",
+            "syntax": "Get appointment(&T):J",
             "threadSafe": true
         },
         {
             "theme": "Appointments",
-            "syntax": "UPDATE APPOINTMENT(&T;&T;&T)",
+            "syntax": "UPDATE APPOINTMENT(&J):J",
             "threadSafe": true
         },
         {
             "theme": "Appointments",
-            "syntax": "DELETE APPOINTMENT(&T;&T)",
+            "syntax": "DELETE APPOINTMENT(&J):J",
             "threadSafe": true
         },
         {
@@ -29,12 +29,12 @@
         },
         {
             "theme": "Appointments",
-            "syntax": "CREATE APPOINTMENT(&T;&T;&T)",
+            "syntax": "CREATE APPOINTMENT(&T;&J):J",
             "threadSafe": true
         },
         {
             "theme": "Appointments",
-            "syntax": "APPOINTMENT NAMES(&Y;&Y)",
+            "syntax": "APPOINTMENT NAMES:C",
             "threadSafe": true
         }
     ]

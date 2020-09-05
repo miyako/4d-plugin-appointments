@@ -113,24 +113,22 @@ namespace CalendarWatch
     
     method_id_t getMethodId(NSString *path_ns)
     {
-        @autoreleasepool
+        NSString *monitorPath_ns = [path_ns stringByDeletingLastPathComponent];
+        CUTF8String monitorPath = CUTF8String((const uint8_t *)[monitorPath_ns UTF8String]);
+        monitorPath += (const uint8_t *)"/";
+        //global variables: CalendarWatch::paths
+        NSLock *l = [[NSLock alloc]init];
+        if ([l tryLock])
         {
-            NSString *monitorPath_ns = [path_ns stringByDeletingLastPathComponent];
-            CUTF8String monitorPath = CUTF8String((const uint8_t *)[monitorPath_ns UTF8String]);
-            monitorPath += (const uint8_t *)"/";
-            //global variables: CalendarWatch::paths
-            NSLock *l = [[NSLock alloc]init];
-            if ([l tryLock])
+            auto i = paths.find(monitorPath);
+            if (i != paths.end())
             {
-                auto i = paths.find(monitorPath);
-                if (i != paths.end())
-                {
-                    return i->second;
-                }
-                [l unlock];
+                return i->second;
             }
-            [l release];
+            [l unlock];
         }
+        [l release];
+        
         return 0;
     }
     
@@ -146,53 +144,51 @@ namespace CalendarWatch
         NSLock *l = [[NSLock alloc]init];
         if ([l tryLock])
         {
-            @autoreleasepool
+            NSArray *paths_ns = (NSArray *)eventPaths;
+            NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"([:HexDigit:]{8}-[:HexDigit:]{4}-[:HexDigit:]{4}-[:HexDigit:]{4}-[:HexDigit:]{12})\\.ics$"
+                                                                                   options:NSRegularExpressionCaseInsensitive
+                                                                                     error:nil];
+            if(regex)
             {
-                NSArray *paths_ns = (NSArray *)eventPaths;
-                NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"([:HexDigit:]{8}-[:HexDigit:]{4}-[:HexDigit:]{4}-[:HexDigit:]{4}-[:HexDigit:]{12})\\.ics$"
-                                                                                                                                                             options:NSRegularExpressionCaseInsensitive
-                                                                                                                                                                 error:nil];
-                if(regex)
+                for(NSUInteger i = 0; i < numEvents; ++i)
                 {
-                    for(NSUInteger i = 0; i < numEvents; ++i)
+                    NSString *path_ns = [paths_ns objectAtIndex:i];
+                    
+                    NSArray *matches = [regex matchesInString:path_ns
+                                                      options:0
+                                                        range:NSMakeRange(0, [path_ns length])];
+                    
+                    for (NSTextCheckingResult *match in matches)
                     {
-                        NSString *path_ns = [paths_ns objectAtIndex:i];
-                        
-                        NSArray *matches = [regex matchesInString:path_ns
-                                                                                            options:0
-                                                                                                range:NSMakeRange(0, [path_ns length])];
-                        
-                        for (NSTextCheckingResult *match in matches)
+                        NSString *event_uid = [path_ns substringWithRange:[match rangeAtIndex:1]];
+                        FSEventStreamEventFlags flags = eventFlags[i];
+                        method_id_t methodId = getMethodId(path_ns);
+                        //                            NSLog(@"flags:%d", (unsigned int)flags);
+                        if(methodId)
                         {
-                            NSString *event_uid = [path_ns substringWithRange:[match rangeAtIndex:1]];
-                            FSEventStreamEventFlags flags = eventFlags[i];
-                            method_id_t methodId = getMethodId(path_ns);
-//                            NSLog(@"flags:%d", (unsigned int)flags);
-                            if(methodId)
+                            if((flags & kFSEventStreamEventFlagItemRemoved) == kFSEventStreamEventFlagItemRemoved)
                             {
-                                if((flags & kFSEventStreamEventFlagItemRemoved) == kFSEventStreamEventFlagItemRemoved)
-                                {
-//                                    NSLog(@"removed calendar item:\t%@", event_uid);
-                                    UserInfo userInfo(notification_delete, event_uid, methodId);
-                                    notifications.push_back(userInfo);
-                                }
-                                else if((flags & kFSEventStreamEventFlagItemCreated) == kFSEventStreamEventFlagItemCreated)
-                                {
-//                                    NSLog(@"created calendar item:\t%@", event_uid);
-                                    UserInfo userInfo(notification_create, event_uid, methodId);
-                                    notifications.push_back(userInfo);
-                                }
-                                else
-                                {
-//                                    NSLog(@"modified calendar item:\t%@", event_uid);
-                                    UserInfo userInfo(notification_update, event_uid, methodId);
-                                    notifications.push_back(userInfo);
-                                }
+                                //                                    NSLog(@"removed calendar item:\t%@", event_uid);
+                                UserInfo userInfo(notification_delete, event_uid, methodId);
+                                notifications.push_back(userInfo);
+                            }
+                            else if((flags & kFSEventStreamEventFlagItemCreated) == kFSEventStreamEventFlagItemCreated)
+                            {
+                                //                                    NSLog(@"created calendar item:\t%@", event_uid);
+                                UserInfo userInfo(notification_create, event_uid, methodId);
+                                notifications.push_back(userInfo);
+                            }
+                            else
+                            {
+                                //                                    NSLog(@"modified calendar item:\t%@", event_uid);
+                                UserInfo userInfo(notification_update, event_uid, methodId);
+                                notifications.push_back(userInfo);
                             }
                         }
                     }
                 }
-            }//@autoreleasepool
+            }
+            
             listenerLoopExecute();
             [l unlock];
         }
@@ -578,25 +574,30 @@ void listenerLoopExecute()
 
 #pragma mark CalendarStore
 
-EKEventStore *json_get_calendar_store(Json::Value& obj)
+EKEventStore *json_get_calendar_store(PA_ObjectRef obj)
 {
     EKEventStore *defaultCalendarStore = [[EKEventStore alloc]init];
-    
-    if(obj)
+        
+    if(defaultCalendarStore)
     {
-        obj["json_get_calendar_store"] = (defaultCalendarStore ? "OK" : "calendar access denied");
+        ob_set_s(obj, L"json_get_calendar_store", "OK");
+
+    }else{
+        
+        ob_set_s(obj, L"json_get_calendar_store", "calendar access denied");
     }
+
     return defaultCalendarStore;
 }
 
-EKCalendar *json_get_calendar(Json::Value& obj, C_TEXT& Param1)
+EKCalendar *json_get_calendar(PA_ObjectRef obj, C_TEXT& Param1)
 {
     EKCalendar *calendar = nil;
    
     EKEventStore *defaultCalendarStore = json_get_calendar_store(obj);
     
     if(defaultCalendarStore)
-    {
+    {        
         NSString *calendarName = Param1.copyUTF16String();
         NSArray *calendars = [defaultCalendarStore calendarsForEntityType:EKEntityTypeEvent];
         for(NSUInteger i = 0; i < [calendars count]; ++i)
@@ -612,37 +613,33 @@ EKCalendar *json_get_calendar(Json::Value& obj, C_TEXT& Param1)
         }
     }
     
-    if(obj)
+    if(calendar)
     {
-        obj["json_get_calendar"] = (calendar ? "OK" : "calendar not found");
+        ob_set_s(obj, L"json_get_calendar", "OK");
+        
+    }else{
+        
+        ob_set_s(obj, L"json_get_calendar", "calendar not found");
+        
     }
     
     return calendar;
 }
 
-EKEvent *json_get_event(Json::Value& obj, C_TEXT& Param1)
+EKEvent *json_get_event(EKEventStore *defaultCalendarStore, PA_ObjectRef obj, NSString *uid)
 {
     EKEvent *event = nil;
     
-    EKEventStore *defaultCalendarStore = json_get_calendar_store(obj);
-    
-    if(defaultCalendarStore)
-    {
-        NSString *uid = Param1.copyUTF16String();
-        
-        NSArray *events = [defaultCalendarStore calendarItemsWithExternalIdentifier:uid];
-        if([events count]) {
-            event = [events objectAtIndex:0];
-        }
-                
-        [uid release];
-        
-        [defaultCalendarStore release];
+    NSArray *events = [defaultCalendarStore calendarItemsWithExternalIdentifier:uid];
+    if([events count]) {
+        event = [events objectAtIndex:0];
     }
-    
-    if(obj)
+        
+    if(event)
     {
-        obj["json_get_event"] = (event ? "OK" : "event not found");
+        ob_set_s(obj, "json_get_event", "OK");
+    }else{
+        ob_set_s(obj, "json_get_event", "event not found");
     }
     
     return event;
@@ -766,13 +763,17 @@ bool json_get_calendarPath(C_TEXT &Param1, CUTF8String &path)
 
 void event_to_json(CUTF16String *eventId, CUTF16String *eventJson)
 {
+    NSString *Param1 = [[NSString alloc]initWithCharacters:(const unichar *)eventJson->c_str() length:eventJson->length()];
     
-    Json::Value r = Json::Value(Json::objectValue);
-
-    C_TEXT Param1;
-    Param1.setUTF16String(eventId);
+    PA_ObjectRef r = PA_CreateObject();
     
-    EKEvent *event = json_get_event(r, Param1);
+    EKEventStore *defaultCalendarStore = [[EKEventStore alloc]init];
+    EKEvent *event = json_get_event(defaultCalendarStore, r, Param1);
+    [defaultCalendarStore release];
+    
+    [Param1 release];
+    
+    PA_DisposeObject(r);
     
     if(event)
     {
@@ -895,27 +896,82 @@ void PluginMain(PA_long32 selector, PA_PluginParameters params) {
 
 #pragma mark -
 
+void event_to_object(EKEvent *event, PA_ObjectRef eventObj) {
+    
+    if(event.location){
+        ob_set_s(eventObj, L"location", [event.location UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"location");
+    }
+    
+    if(event.notes){
+        ob_set_s(eventObj, L"notes", [event.notes UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"notes");
+    }
+
+    if(event.title){
+        ob_set_s(eventObj, L"title", [event.title UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"title");
+    }
+    
+    if(event.calendarItemExternalIdentifier){
+        ob_set_s(eventObj, L"id", [event.calendarItemExternalIdentifier UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"id");
+    }
+    
+    if(event.URL){
+        ob_set_s(eventObj, L"url", [[event.URL absoluteString]UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"url");
+    }
+    
+    if(event.startDate){
+        ob_set_s(eventObj, L"startDate", [[DateFormatter::GMT stringFromDate:event.startDate]UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"startDate");
+    }
+    
+    if(event.endDate){
+        ob_set_s(eventObj, L"endDate", [[DateFormatter::GMT stringFromDate:event.endDate]UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"endDate");
+    }
+    
+    if(event.calendar){
+        ob_set_s(eventObj, L"calendar", [event.calendar.title UTF8String]);
+        ob_set_s(eventObj, L"calendarIdentifier", [event.calendar.calendarIdentifier UTF8String]);
+    }else{
+        ob_set_0(eventObj, L"calendar");
+        ob_set_0(eventObj, L"calendarIdentifier");
+    }
+    
+    if((event.startDate) && (event.endDate)){
+        ob_set_n(eventObj, L"duration", [event.endDate timeIntervalSinceDate:event.startDate]);
+    }else{
+        ob_set_0(eventObj, L"duration");
+    }
+
+}
+
 void ALL_APPOINTMENTS(PA_PluginParameters params) {
 
-    sLONG_PTR *pResult = (sLONG_PTR *)params->fResult;
     PackagePtr pParams = (PackagePtr)params->fParameters;
     
     C_TEXT Param1;
-    C_TEXT Param2;
     
     Param1.fromParamAtIndex(pParams, 1);
     
-    Json::Value ee = Json::Value(Json::arrayValue);
+    PA_CollectionRef appointments = PA_CreateCollection();
+    PA_ObjectRef returnValue = PA_CreateObject();
     
-    //no err object
-    
-    EKEventStore *defaultCalendarStore = [[EKEventStore alloc]init];
-    
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(returnValue);
+
     if(defaultCalendarStore)
     {
-        Json::Value r = Json::Value(Json::objectValue);
-        
-        EKCalendar *calendar = json_get_calendar(r, Param1);
+         EKCalendar *calendar = json_get_calendar(returnValue, Param1);
         
         if(calendar)
         {
@@ -934,249 +990,311 @@ void ALL_APPOINTMENTS(PA_PluginParameters params) {
                 {
                     EKEvent *event = [events objectAtIndex:j];
                     
-                    Json::Value e = Json::Value(Json::objectValue);
-                    json_set_event(e, event);
-                    ee.append(e);
+                    if(event)
+                    {
+                        PA_ObjectRef eventObj = PA_CreateObject();
+                        event_to_object(event, eventObj);
+
+                        PA_Variable v = PA_CreateVariable(eVK_Object);
+                        PA_SetObjectVariable(&v, eventObj);
+                        PA_SetCollectionElement(appointments, PA_GetCollectionLength(appointments), v);
+                        PA_ClearVariable(&v);
+
+                    }
                 }
+                
+                ob_set_c(returnValue, L"appointments", appointments);
             }
         }
         
         [defaultCalendarStore release];
     }
     
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
-    
-    C_TEXT t;
-    std::string json = Json::writeString(writer, ee);
-    Param2.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-    
-    Param2.toParamAtIndex(pParams, 2);
+    PA_ReturnObject(params, returnValue);
 }
 
 void Get_appointment(PA_PluginParameters params) {
 
-    sLONG_PTR *pResult = (sLONG_PTR *)params->fResult;
     PackagePtr pParams = (PackagePtr)params->fParameters;
  
     C_TEXT Param1;
-    C_TEXT Param2;
-    C_TEXT returnValue;
     
     Param1.fromParamAtIndex(pParams, 1);
     
-    Json::Value r = Json::Value(Json::objectValue);
-    
-    EKEventStore *defaultCalendarStore = json_get_calendar_store(r);
+    PA_ObjectRef returnValue = PA_CreateObject();
+        
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(returnValue);
     
     if(defaultCalendarStore)
     {
-        EKEvent *event = json_get_event(r, Param1);
-        
+        NSString *uid = Param1.copyUTF16String();
+        EKEvent *event = json_get_event(defaultCalendarStore, returnValue, uid);
+        [uid release];
+                
         if(event)
         {
-            Json::Value e = Json::Value(Json::objectValue);
-            json_set_event(e, event);
-            
-            Json::StreamWriterBuilder writer;
-            writer["indentation"] = "";
-            
-            C_TEXT t;
-            std::string json = Json::writeString(writer, e);
-            returnValue.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
+            PA_ObjectRef eventObj = PA_CreateObject();
+            event_to_object(event, eventObj);
+            ob_set_o(returnValue, L"event", eventObj);
         }
         
         [defaultCalendarStore release];
     }
+
     
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
-    
-    C_TEXT t;
-    std::string json = Json::writeString(writer, r);
-    Param2.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-    
-    Param2.toParamAtIndex(pParams, 2);
-    returnValue.setReturn(pResult);
+    PA_ReturnObject(params, returnValue);
 }
 
 void UPDATE_APPOINTMENT(PA_PluginParameters params) {
 
-    PackagePtr pParams = (PackagePtr)params->fParameters;
-    
-    C_TEXT Param1;
-    C_TEXT Param2;
-    C_TEXT Param3;
-    
-    Param1.fromParamAtIndex(pParams, 1);
-    Param2.fromParamAtIndex(pParams, 2);
-    
-    Json::Value r = Json::Value(Json::objectValue);
-    
-    Json::Value root;
-    Json::CharReaderBuilder builder;
-    std::string errors;
-    
-    CUTF8String Param2_u8;
-    Param2.copyUTF8String(&Param2_u8);
-    
-    Json::CharReader *reader = builder.newCharReader();
-    bool parse = reader->parse((const char *)Param2_u8.c_str(),
-                               (const char *)Param2_u8.c_str() + Param2_u8.size(),
-                               &root,
-                               &errors);
-    delete reader;
-    
-    if(parse)
-    {
-        if(root)
-        {
-            Json::Value e;
-            
-            if(root.isArray()){
-                
-                if(root.size()){
-                    
-                    e = root[0];
-                }
-                
-            }
-            
-            if(root.isObject()){
-                
-                e = root;
-                
-            }
-            
-            EKEventStore *defaultCalendarStore = json_get_calendar_store(r);
-            
-            if(defaultCalendarStore){
-                
-                @autoreleasepool
-                {
-                    EKEvent *event = json_get_event(r, Param1);
-                    
-                    if(event)
-                    {
-                        if(e["location"].isString()){
-                            event.location = [NSString stringWithUTF8String:e["location"].asString().c_str()];
-                        }
-                        
-                        if(e["notes"].isString()){
-                            event.notes = [NSString stringWithUTF8String:e["notes"].asString().c_str()];
-                        }
-                        
-                        if(e["title"].isString()){
-                            event.title = [NSString stringWithUTF8String:e["title"].asString().c_str()];
-                        }
-                        
-                        if(e["url"].isString()){
-                            event.URL = [NSURL URLWithString:[NSString stringWithUTF8String:e["url"].asString().c_str()]];
-                        }
-                        
-                        if(e["startDate"].isString()){
-                            
-                            NSString *s = [NSString stringWithUTF8String:e["startDate"].asString().c_str()];
-                            if([s hasSuffix:@"Z"])
-                            {
-                                event.startDate = [DateFormatter::GMT dateFromString:s];
-                            }else
-                            {
-                                event.startDate = [DateFormatter::ISO dateFromString:s];
-                            }
-                        }
-                       
-                        if(e["endDate"].isString()){
-                            
-                            NSString *s = [NSString stringWithUTF8String:e["endDate"].asString().c_str()];
-                            if([s hasSuffix:@"Z"])
-                            {
-                                event.endDate = [DateFormatter::GMT dateFromString:s];
-                            }else
-                            {
-                                event.endDate = [DateFormatter::ISO dateFromString:s];
-                            }
-                        }
-                        
-                        NSError *error = nil;
-                        
-                        if(![defaultCalendarStore saveEvent:event span:EKSpanThisEvent  commit:YES error:&error])
-                        {
-                            r["saveEvent"] = "save failed";
-                            r["saveEventErrorDescription"] = [[error description]UTF8String];
-                            
-                        }else{
-                            r["saveEvent"] = "OK";
-                            json_set_event(e, event);
-                            
-                        }
-                    }
-                }
-                
-                Json::StreamWriterBuilder writer;
-                writer["indentation"] = "";
-                
-                C_TEXT t;
-                std::string json = Json::writeString(writer, e);
-                Param2.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-                
-                [defaultCalendarStore release];
-            }
-        }
-    }
-
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
-    
-    C_TEXT t;
-    std::string json = Json::writeString(writer, r);
-    Param3.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-    
-    Param2.toParamAtIndex(pParams, 2);
-    Param3.toParamAtIndex(pParams, 3);
-}
-
-void DELETE_APPOINTMENT(PA_PluginParameters params) {
-
-    PackagePtr pParams = (PackagePtr)params->fParameters;
-    
-    C_TEXT Param1;
-    C_TEXT Param2;
-    
-    Param1.fromParamAtIndex(pParams, 1);
-    
-    Json::Value r = Json::Value(Json::objectValue);
-    
-    EKEventStore *defaultCalendarStore = json_get_calendar_store(r);
+    PA_ObjectRef Param1 = PA_GetObjectParameter(params, 1);
+    PA_ObjectRef returnValue = PA_CreateObject();
+        
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(returnValue);
     
     if(defaultCalendarStore)
     {
-        EKEvent *event = json_get_event(r, Param1);
-        
-        if(event)
-        {
-            NSError *error = nil;
+      
+        if(Param1){
             
-            if(![defaultCalendarStore removeEvent:event span:EKSpanThisEvent error:&error])
+            CUTF8String _calendarItemExternalIdentifier;
+            if(ob_get_s(Param1, L"id", &_calendarItemExternalIdentifier))
             {
-                r["removeEvent"] = "remove failed";
-                r["removeEventErrorDescription"] = [[error description]UTF8String];
-            }else
-            {
-                r["removeEvent"] = "OK";
+                NSString *uid = [NSString stringWithUTF8String:(const char*)_calendarItemExternalIdentifier.c_str()];
+                
+                EKEvent *event = json_get_event(defaultCalendarStore, returnValue, uid);
+                
+                if(event)
+                {
+                    CUTF8String _location;
+                    if(ob_get_s(Param1, L"location", &_location)){
+                        event.location = [NSString stringWithUTF8String:(const char *)_location.c_str()];
+                    }
+                    
+                    CUTF8String _notes;
+                    if(ob_get_s(Param1, L"notes", &_notes)){
+                        event.notes = [NSString stringWithUTF8String:(const char *)_notes.c_str()];
+                    }
+                    
+                    CUTF8String _title;
+                    if(ob_get_s(Param1, L"title", &_title)){
+                        event.title = [NSString stringWithUTF8String:(const char *)_title.c_str()];
+                    }
+                    
+                    CUTF8String _url;
+                    if(ob_get_s(Param1, L"url", &_url)){
+                        event.URL = [NSURL URLWithString:[NSString stringWithUTF8String:(const char *)_url.c_str()]];
+                    }
+                    
+                    CUTF8String _startDate;
+                    if(ob_get_s(Param1, L"startDate", &_startDate)){
+                        NSString *s = [NSString stringWithUTF8String:(const char *)_startDate.c_str()];
+                        if([s hasSuffix:@"Z"])
+                        {
+                            event.startDate = [DateFormatter::GMT dateFromString:s];
+                        }else
+                        {
+                            event.startDate = [DateFormatter::ISO dateFromString:s];
+                        }
+                    }
+                    
+                    CUTF8String _endDate;
+                    if(ob_get_s(Param1, L"endDate", &_endDate)){
+                        NSString *s = [NSString stringWithUTF8String:(const char *)_endDate.c_str()];
+                        if([s hasSuffix:@"Z"])
+                        {
+                            event.endDate = [DateFormatter::GMT dateFromString:s];
+                        }else
+                        {
+                            event.endDate = [DateFormatter::ISO dateFromString:s];
+                        }
+                    }
+                                        
+                    NSError *error = nil;
+                    
+                    if(![defaultCalendarStore saveEvent:event span:EKSpanThisEvent  commit:YES error:&error])
+                    {
+                        ob_set_s(returnValue, L"saveEvent", "save failed");
+                        ob_set_s(returnValue, L"saveEventErrorDescription", [[error description]UTF8String]);
+                          
+                    }else{
+                       ob_set_s(returnValue, L"saveEvent", "OK");
+                        
+                        PA_ObjectRef eventObj = PA_CreateObject();
+                        event_to_object(event, eventObj);
+                        ob_set_o(returnValue, L"event", eventObj);
+                        
+                    }
+                }
             }
         }
+        
         [defaultCalendarStore release];
     }
 
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
+    PA_ReturnObject(params, returnValue);
+}
+
+void CREATE_APPOINTMENT(PA_PluginParameters params) {
+
+    PackagePtr pParams = (PackagePtr)params->fParameters;
     
-    C_TEXT t;
-    std::string json = Json::writeString(writer, r);
-    Param2.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
+    C_TEXT Param1;
     
-    Param2.toParamAtIndex(pParams, 2);
+    Param1.fromParamAtIndex(pParams, 1);
+    
+    PA_ObjectRef Param2 = PA_GetObjectParameter(params, 2);
+    PA_ObjectRef returnValue = PA_CreateObject();
+             
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(returnValue);
+    
+    if(defaultCalendarStore){
+        
+        EKCalendar *calendar = json_get_calendar(returnValue, Param1);
+        
+        if(calendar)
+        {
+            EKEvent *event = [EKEvent eventWithEventStore:defaultCalendarStore];
+            
+            event.calendar = calendar;
+            
+            CUTF8String _location;
+            if(ob_get_s(Param2, L"location", &_location)){
+                event.location = [NSString stringWithUTF8String:(const char *)_location.c_str()];
+            }
+            
+            CUTF8String _notes;
+            if(ob_get_s(Param2, L"notes", &_notes)){
+                event.notes = [NSString stringWithUTF8String:(const char *)_notes.c_str()];
+            }
+            
+            CUTF8String _title;
+            if(ob_get_s(Param2, L"title", &_title)){
+                event.title = [NSString stringWithUTF8String:(const char *)_title.c_str()];
+            }
+            
+            CUTF8String _url;
+            if(ob_get_s(Param2, L"url", &_url)){
+                event.URL = [NSURL URLWithString:[NSString stringWithUTF8String:(const char *)_url.c_str()]];
+            }
+            
+            CUTF8String _startDate;
+            if(ob_get_s(Param2, L"startDate", &_startDate)){
+                NSString *s = [NSString stringWithUTF8String:(const char *)_startDate.c_str()];
+                if([s hasSuffix:@"Z"])
+                {
+                    event.startDate = [DateFormatter::GMT dateFromString:s];
+                }else
+                {
+                    event.startDate = [DateFormatter::ISO dateFromString:s];
+                }
+            }
+            
+            CUTF8String _endDate;
+            if(ob_get_s(Param2, L"endDate", &_endDate)){
+                NSString *s = [NSString stringWithUTF8String:(const char *)_endDate.c_str()];
+                if([s hasSuffix:@"Z"])
+                {
+                    event.endDate = [DateFormatter::GMT dateFromString:s];
+                }else
+                {
+                    event.endDate = [DateFormatter::ISO dateFromString:s];
+                }
+            }
+            
+            NSError *error = nil;
+            
+            if(![defaultCalendarStore saveEvent:event span:EKSpanThisEvent  commit:YES error:&error])
+            {
+                ob_set_s(returnValue, L"saveEvent", "save failed");
+                ob_set_s(returnValue, L"saveEventErrorDescription", [[error description]UTF8String]);
+                
+            }else{
+                ob_set_s(returnValue, L"saveEvent", "OK");
+                
+                PA_ObjectRef eventObj = PA_CreateObject();
+                event_to_object(event, eventObj);
+                ob_set_o(returnValue, L"event", eventObj);
+            }
+            
+        }
+        
+        [defaultCalendarStore release];
+    }
+
+    PA_ReturnObject(params, returnValue);
+}
+
+void DELETE_APPOINTMENT(PA_PluginParameters params) {
+    
+    PA_ObjectRef Param1 = PA_GetObjectParameter(params, 1);
+    PA_ObjectRef returnValue = PA_CreateObject();
+        
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(returnValue);
+    
+    if(defaultCalendarStore)
+    {
+      
+        if(Param1){
+            
+            CUTF8String _calendarItemExternalIdentifier;
+            if(ob_get_s(Param1, L"id", &_calendarItemExternalIdentifier))
+            {
+                NSString *uid = [NSString stringWithUTF8String:(const char*)_calendarItemExternalIdentifier.c_str()];
+                
+                EKEvent *event = json_get_event(defaultCalendarStore, returnValue, uid);
+                
+                if(event)
+                {
+                    NSError *error = nil;
+                    
+                    if(![defaultCalendarStore removeEvent:event span:EKSpanThisEvent error:&error])
+                    {
+                        ob_set_s(returnValue, L"removeEvent", "remove failed");
+                        ob_set_s(returnValue, L"removeEventErrorDescription", [[error description]UTF8String]);
+                        
+                    }else
+                    {
+                        ob_set_s(returnValue, L"removeEvent", "OK");
+                    }
+                }
+            }
+        }
+        
+        [defaultCalendarStore release];
+    }
+
+    PA_ReturnObject(params, returnValue);
+}
+
+void APPOINTMENT_NAMES(PA_PluginParameters params) {
+
+    PA_CollectionRef appointments = PA_CreateCollection();
+    
+    PA_ObjectRef r = PA_CreateObject();
+    EKEventStore *defaultCalendarStore = json_get_calendar_store(r);
+    PA_DisposeObject(r);
+    
+    if(defaultCalendarStore)
+    {
+        NSArray *calendars = [defaultCalendarStore calendarsForEntityType:EKEntityTypeEvent];
+        for(NSUInteger i = 0; i < [calendars count]; ++i)
+        {
+            EKCalendar *c = [calendars objectAtIndex:i];
+            PA_ObjectRef calendar = PA_CreateObject();
+            ob_set_s(calendar, L"title", [[c title]UTF8String]);
+            ob_set_s(calendar, L"calendarIdentifier", [[c calendarIdentifier]UTF8String]);
+            
+            PA_Variable v = PA_CreateVariable(eVK_Object);
+            PA_SetObjectVariable(&v, calendar);
+            PA_SetCollectionElement(appointments, PA_GetCollectionLength(appointments), v);
+            PA_ClearVariable(&v);
+        }
+        
+        [defaultCalendarStore release];
+    }
+    
+    PA_ReturnCollection(params, appointments);
 }
 
 void ON_APPOINTMENT_CALL(PA_PluginParameters params) {
@@ -1199,177 +1317,4 @@ void ON_APPOINTMENT_CALL(PA_PluginParameters params) {
             CalendarWatch::addToWatch(path, methodId);
         }
     }
-}
-
-void CREATE_APPOINTMENT(PA_PluginParameters params) {
-
-    PackagePtr pParams = (PackagePtr)params->fParameters;
-    
-    C_TEXT Param1;
-    C_TEXT Param2;
-    C_TEXT Param3;
-    
-    Param1.fromParamAtIndex(pParams, 1);
-    Param2.fromParamAtIndex(pParams, 2);
-    
-    Json::Value r = Json::Value(Json::objectValue);
-    
-    Json::Value root;
-    Json::CharReaderBuilder builder;
-    std::string errors;
-    
-    CUTF8String Param2_u8;
-    Param2.copyUTF8String(&Param2_u8);
-    
-    Json::CharReader *reader = builder.newCharReader();
-    bool parse = reader->parse((const char *)Param2_u8.c_str(),
-                               (const char *)Param2_u8.c_str() + Param2_u8.size(),
-                               &root,
-                               &errors);
-    delete reader;
-    
-    if(parse)
-    {
-        if(root)
-        {
-            Json::Value e;
-            
-            if(root.isArray()){
-                
-                if(root.size()){
-                    
-                    e = root[0];
-                }
-                
-            }
-            
-            if(root.isObject()){
-                
-                e = root;
-                
-            }
-            
-            EKEventStore *defaultCalendarStore = json_get_calendar_store(r);
-            
-            if(defaultCalendarStore){
-                
-                EKCalendar *calendar = json_get_calendar(r, Param1);
-                
-                if(calendar)
-                {
-                    @autoreleasepool
-                    {
-                        EKEvent  *event = [EKEvent eventWithEventStore:defaultCalendarStore];
-
-                        event.calendar = calendar;
-                        
-                        if(e["location"].isString()){
-                            event.location = [NSString stringWithUTF8String:e["location"].asString().c_str()];
-                        }
-                       
-                        if(e["notes"].isString()){
-                            event.notes = [NSString stringWithUTF8String:e["notes"].asString().c_str()];
-                        }
-                        
-                        if(e["title"].isString()){
-                            event.title = [NSString stringWithUTF8String:e["title"].asString().c_str()];
-                        }
-                        
-                        if(e["url"].isString()){
-                            event.URL = [NSURL URLWithString:[NSString stringWithUTF8String:e["url"].asString().c_str()]];
-                        }
-
-                        if(e["startDate"].isString()){
-                            
-                            NSString *s = [NSString stringWithUTF8String:e["startDate"].asString().c_str()];
-                            if([s hasSuffix:@"Z"])
-                            {
-                                event.startDate = [DateFormatter::GMT dateFromString:s];
-                            }else
-                            {
-                                event.startDate = [DateFormatter::ISO dateFromString:s];
-                            }
-                        }
-
-                        if(e["endDate"].isString()){
-                            
-                            NSString *s = [NSString stringWithUTF8String:e["endDate"].asString().c_str()];
-                            if([s hasSuffix:@"Z"])
-                            {
-                                event.endDate = [DateFormatter::GMT dateFromString:s];
-                            }else
-                            {
-                                event.endDate = [DateFormatter::ISO dateFromString:s];
-                            }
-                        }
-
-                        NSError *error = nil;
-                        
-                        if(![defaultCalendarStore saveEvent:event span:EKSpanThisEvent  commit:YES error:&error])
-                        {
-                            r["saveEvent"] = "save failed";
-                            r["saveEventErrorDescription"] = [[error description]UTF8String];
-                            
-                        }else{
-                            r["saveEvent"] = "OK";
-                            json_set_event(e, event);
-                            
-                        }
-                    }
-                }
-                
-                [defaultCalendarStore release];
-            }
-            
-            Json::StreamWriterBuilder writer;
-            writer["indentation"] = "";
-            
-            C_TEXT t;
-            std::string json = Json::writeString(writer, e);
-            Param2.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-
-        }
-    }
-    
-    Json::StreamWriterBuilder writer;
-    writer["indentation"] = "";
-    
-    C_TEXT t;
-    std::string json = Json::writeString(writer, r);
-    Param3.setUTF8String((const uint8_t *)json.c_str(), (uint32_t)json.length());
-    
-    Param2.toParamAtIndex(pParams, 2);
-    Param3.toParamAtIndex(pParams, 3);
-}
-
-void APPOINTMENT_NAMES(PA_PluginParameters params) {
-
-    PackagePtr pParams = (PackagePtr)params->fParameters;
-
-    ARRAY_TEXT Param1;
-    ARRAY_TEXT Param2;
-        
-    //no err object
-    
-    EKEventStore *defaultCalendarStore = [[EKEventStore alloc]init];
-    
-    if(defaultCalendarStore)
-    {
-        Param1.setSize(1);
-        Param2.setSize(1);
-        
-        NSArray *calendars = [defaultCalendarStore calendarsForEntityType:EKEntityTypeEvent];
-        for(NSUInteger i = 0; i < [calendars count]; ++i)
-        {
-            EKCalendar *c = [calendars objectAtIndex:i];
-            Param1.appendUTF16String([c title]);
-            Param2.appendUTF16String([c calendarIdentifier]);
-        }
-        
-        [defaultCalendarStore release];
-    }
-    
-    Param1.toParamAtIndex(pParams, 1);
-    Param2.toParamAtIndex(pParams, 2);
-    
 }

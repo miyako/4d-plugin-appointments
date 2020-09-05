@@ -198,12 +198,12 @@
 		"stamp": "2019-12-13T04:37:40.619Z"
 	},
 	"Sources/Methods/TEST_appointment.4dm": {
-		"startSelection": 0,
-		"endSelection": 0,
-		"firstSelectedLine": 9,
-		"lastSelectedLine": 9,
+		"startSelection": 43,
+		"endSelection": 43,
+		"firstSelectedLine": 15,
+		"lastSelectedLine": 15,
 		"folding": [],
 		"bookmarks": [],
-		"stamp": "2020-09-05T19:55:00.535Z"
+		"stamp": "2020-09-05T23:11:45.459Z"
 	}
 }
